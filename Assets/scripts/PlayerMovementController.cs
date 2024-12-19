@@ -7,31 +7,50 @@ public class PlayerMovementController : MonoBehaviour
     // 定义角色控制器（用于处理角色的物理碰撞和移动）
     CharacterController playerController;
 
+    //玩家生命值管理器
+    public PlayerDamageController playerDamageController;
+
     // 用于存储角色的移动方向
     Vector3 direction;
+
+    //输入栏输入模式，禁用wasd移动
+    public SkyboxSwitcher skyboxSwitcher;
 
     // 角色的基本移动速度
     public float speed = 6;
 
     // 跳跃的力量（影响跳跃的高度）
-    public float jumpPower = 0.0005f;
+    public float jumpPower = 0.0001f;
 
     // 重力的大小，用于控制跳跃后的下落速度
     public float gravity = 10f;
+
+    // 击退的速度（瞬时施加的力）
+    public Vector3 knockbackVelocity;
+
+    // 受伤后，击退持续时间
+    public float knockbackDuration = 0.5f;
+    public float knockbackTime = 0f;
 
     // 鼠标的移动速度，用于控制视角旋转的速度
     public float mousespeed = 5f;
 
     // 鼠标旋转的上下限制角度
-    public float minmouseY = -45f;
-    public float maxmouseY = 45f;
+    public float minmouseY = -90f;
+    public float maxmouseY = 90f;
 
     // 记录当前视角的X和Y旋转角度
     float RotationY = 0f;
     float RotationX = 0f;
 
-    // 相机的Transform，用于控制相机的旋转
+    // 第一人称摄像机
     public Transform agretctCamera;
+    // 俯瞰摄像机
+    public Transform topDownCamera;
+
+    //获得音频
+    private AudioSource audioSource;    
+    public AudioClip hurtSound;
 
     // 在游戏开始时获取CharacterController组件
     void Start()
@@ -43,6 +62,11 @@ public class PlayerMovementController : MonoBehaviour
     // 每一帧更新时调用，用于处理玩家的移动和视角控制
     void Update()
     {
+        if ((skyboxSwitcher.entering))
+        {
+            return;
+        }
+
         // 获取玩家输入的水平和垂直轴（WASD或箭头键）
         float _horizontal = Input.GetAxis("Horizontal");
         float _vertical = Input.GetAxis("Vertical");
@@ -84,6 +108,14 @@ public class PlayerMovementController : MonoBehaviour
         // 将计算出来的移动方向转换到世界坐标系下并执行移动
         playerController.Move(playerController.transform.TransformDirection(direction * Time.deltaTime * speed));
 
+        // 在这里施加击退效果
+        if (knockbackTime > 0)
+        {
+            // 施加击退力
+            playerController.Move(knockbackVelocity * Time.deltaTime);
+            knockbackTime -= Time.deltaTime; // 击退时间减少
+        }
+
         // 获取并更新鼠标输入，控制玩家左右旋转（旋转角度累加）
         RotationX += Input.GetAxis("Mouse X") * mousespeed;
 
@@ -97,5 +129,25 @@ public class PlayerMovementController : MonoBehaviour
         // 更新相机的旋转，控制相机的上下视角旋转
         agretctCamera.transform.eulerAngles = new Vector3(RotationY, RotationX, 0);
 
+        // 俯瞰视角：摄像机位于角色上方，并始终注视玩家
+        //topDownCamera.LookAt(this.transform); // 始终注视玩家
+
+    }
+
+    public void PlayerDamaged(Vector3 knockbackDirection, float knockbackStrength)
+    {
+        Debug.Log("Attacked++!");
+
+        // 计算击退效果，方向是击退方向，力度由传入的参数决定
+        knockbackVelocity = knockbackDirection.normalized * knockbackStrength;
+
+        // 设置击退时间
+        knockbackTime = knockbackDuration;
+
+        //播放音频
+        AudioSource.PlayClipAtPoint(hurtSound, Vector3.zero);
+
+        //扣一点血
+        playerDamageController.TakeDamage(1);
     }
 }
